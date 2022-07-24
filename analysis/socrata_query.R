@@ -108,11 +108,27 @@ test_get_fics_names <- get_fics_names(.nombre_entidad = c("bancolombia", "alianz
 
 # get fpv ----
 
-# fpv <- URLencode("https://www.datos.gov.co/resource/gpzw-wmxd.json") %>% 
-#   fromJSON() %>% type_convert()
-# 
-# fics <- URLencode("https://www.datos.gov.co/resource/qhpu-8ixx.json") %>% 
-#   fromJSON() %>% type_convert()
+fpv <- URLencode("https://www.datos.gov.co/resource/gpzw-wmxd.json?$where=traslados_aseguradoras_rentas = '0.000000'") %>%
+  fromJSON() %>% type_convert()
 
+fpv2 <- URLencode("https://www.datos.gov.co/resource/gpzw-wmxd.json?$query=SELECT fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio, sum(valor_unidad_operaciones), sum(precio_cierre_fondo_dia_t), sum(valor_fondo_cierre_dia_t_2) where fecha_corte between '2022-06-30T00:00:00.000' and '2022-06-30T00:00:00.000' and nombre_patrimonio in('FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÃ“N', 'FONDO VOLUNTARIO DE PENSION MULTIOPCION', 'FONDO DE PENSIONES VOLUNTARIAS MULTIACCION', 'FONDO VOLUNTARIO DE PENSIONES GNB', 'F.V.P. DAFUTURO', 'FONDO VOLUNTARIO PENSIONES JUBILACION INVALIDEZ CORREVAL', 'FONDO VOLUNTARIO DE PENSIÃ“N BTG PACTUAL', 'FONDO DE PENSIONES VOLUNTARIAS PLATINO', 'FONDO VOLUNTARIO DE PENSIONES DE JUBILACION E INVALIDEZ RENTA4GLOBAL FIDUCIARIA', 'FDO VOLUNTARIO PENSIONES COLSEGUROS', 'FDO.PENS.VOL.CLASS INVERSIONES', 'FONDO PENSIONES ESMURFIT VOLUNTA', 'FDO,  DE PENSIO. PROTECCI. VOLUNTAR', 'FONDO VOLUNTARIO DE PENSION PORVENIR', 'FDO VOLUNT DE PENSIONES MULTIFIND') and tipo_entidad='5' group by fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio LIMIT 100000000") %>%
+  fromJSON() %>% type_convert()
+
+URLdecode("%C3%A1 %C3%A9 %C3%AD %C3%B3 %C3%BA %C3%81 %C3%89 %C3%8D %C3%93 %C3%9A") 
+
+
+#probar pasandolo por funciones para ver si pasa las tildes, de lo contrario usar:
+str_replace_all(c("FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN",
+                  "FONDO VOLUNTARIO DE PENSIÓN BTG PACTUAL"),
+                c("á" = "Ã¡",
+                  "é" = "Ã©",
+                  "í" = "Ã",
+                  "ó" = "Ã³",
+                  "ú" = "Ãº",
+                  "Á" = "Ã\u0081",
+                  "É" = "Ã‰",
+                  "Í" = "Ã\u008d",
+                  "Ó" = "Ã“",
+                  "Ú" = "Ãš"))
 
 
