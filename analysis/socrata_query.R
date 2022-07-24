@@ -18,7 +18,7 @@ get_fics <- function(
       to <- ymd(to)
       
       # Estructura url
-      url_head <- str_glue("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio, sum(numero_unidades_fondo_cierre), sum(valor_fondo_cierre_dia_t), sum(numero_inversionistas), sum(aportes_recibidos), sum(retiros_redenciones), sum(anulaciones) where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' and tipo_entidad='5' ")
+      url_head <- str_glue("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio, sum(numero_unidades_fondo_cierre), sum(precierre_fondo_dia_t), sum(valor_fondo_cierre_dia_t), sum(numero_inversionistas), sum(aportes_recibidos), sum(retiros_redenciones), sum(anulaciones) where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' and tipo_entidad='5' ")
       
       if (!is.null(empresa)) {
           
@@ -42,7 +42,6 @@ get_fics <- function(
         }
       
       url_tail <- "group by fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio LIMIT 100000000"
-      
       url_total <- str_c(url_head,
                          empresa,
                          patrimonio,
@@ -50,6 +49,7 @@ get_fics <- function(
                          url_tail) %>% 
           URLencode()
       
+      # A data frame
       fromJSON(url_total) %>% 
           mutate(across(starts_with("sum_"), as.numeric),
                  fecha_corte = ymd_hms(fecha_corte) %>% 
@@ -106,7 +106,13 @@ test_get_fics_names <- get_fics_names(.nombre_entidad = c("bancolombia", "alianz
                                       .nombre_patrimonio = "alternativo", 
                                       .select = c("nombre_entidad", "nombre_patrimonio", "max_fecha_corte"))
 
+# get fpv ----
 
+# fpv <- URLencode("https://www.datos.gov.co/resource/gpzw-wmxd.json") %>% 
+#   fromJSON() %>% type_convert()
+# 
+# fics <- URLencode("https://www.datos.gov.co/resource/qhpu-8ixx.json") %>% 
+#   fromJSON() %>% type_convert()
 
 
 
