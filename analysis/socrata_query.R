@@ -108,28 +108,87 @@ test_get_fics_names <- get_fics_names(.nombre_entidad = c("bancolombia", "alianz
 
 # get fpv ----
 
-fpv_names <- c(
-  "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN", #
-  "FONDO VOLUNTARIO DE PENSION MULTIOPCION", 
-  "FONDO DE PENSIONES VOLUNTARIAS MULTIACCION", 
-  "FONDO VOLUNTARIO DE PENSIONES GNB", 
-  "F.V.P. DAFUTURO", 
-  "FONDO VOLUNTARIO PENSIONES JUBILACION INVALIDEZ CORREVAL",
-  "FONDO VOLUNTARIO DE PENSIÓN BTG PACTUAL", 
-  "FONDO DE PENSIONES VOLUNTARIAS PLATINO", 
-  "FONDO VOLUNTARIO DE PENSIONES DE JUBILACION E INVALIDEZ RENTA4GLOBAL FIDUCIARIA", 
-  "FDO VOLUNTARIO PENSIONES COLSEGUROS",
-  "FDO.PENS.VOL.CLASS INVERSIONES",
-  "FONDO PENSIONES ESMURFIT VOLUNTA",
-  "FDO,  DE PENSIO. PROTECCI. VOLUNTAR", 
-  "FONDO VOLUNTARIO DE PENSION PORVENIR",
-  "FDO VOLUNT DE PENSIONES MULTIFIND"
+get_fpvs <- function(
+  empresa = NULL,
+  patrimonio = NULL,
+  subtipo_patrimonio = NULL,
+  from = today() - years(2),
+  to = today()) {
+  
+  # Transformanos str a date
+  from <- ymd(from)
+  to <- ymd(to)
+  
+  # Nombres fondos vigentes
+  fpv_names <- c(
+    "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN", #
+    "FONDO VOLUNTARIO DE PENSION MULTIOPCION", 
+    "FONDO DE PENSIONES VOLUNTARIAS MULTIACCION", 
+    "FONDO VOLUNTARIO DE PENSIONES GNB", 
+    "F.V.P. DAFUTURO", 
+    "FONDO VOLUNTARIO PENSIONES JUBILACION INVALIDEZ CORREVAL",
+    "FONDO VOLUNTARIO DE PENSIÓN BTG PACTUAL", 
+    "FONDO DE PENSIONES VOLUNTARIAS PLATINO", 
+    "FONDO VOLUNTARIO DE PENSIONES DE JUBILACION E INVALIDEZ RENTA4GLOBAL FIDUCIARIA", 
+    "FDO VOLUNTARIO PENSIONES COLSEGUROS",
+    "FDO.PENS.VOL.CLASS INVERSIONES",
+    "FONDO PENSIONES ESMURFIT VOLUNTA",
+    "FDO,  DE PENSIO. PROTECCI. VOLUNTAR", 
+    "FONDO VOLUNTARIO DE PENSION PORVENIR",
+    "FDO VOLUNT DE PENSIONES MULTIFIND"
   ) %>%
-  str_c(collapse = "', '")
+    str_c(collapse = "', '")
+  
+  # Estructura url
+  url_head <- str_glue("https://www.datos.gov.co/resource/gpzw-wmxd.json?$query=SELECT fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio, sum(valor_unidad_operaciones), sum(precio_cierre_fondo_dia_t), sum(valor_fondo_cierre_dia_t_2) where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' and nombre_patrimonio in('{fpv_names}') ")
+  
+  if (!is.null(empresa)) {
+    
+    empresa <- str_c(empresa, collapse = "' ,'")
+    
+    empresa <- str_glue("and nombre_entidad in('{empresa}') ")
+  }
+  
+  if (!is.null(patrimonio)) {
+    
+    patrimonio <- str_c(patrimonio, collapse = "' ,'")
+    
+    patrimonio <- str_glue("and nombre_patrimonio in('{patrimonio}') ")
+  }
+  
+  if (!is.null(subtipo_patrimonio)) {
+    
+    subtipo_patrimonio <- str_c(subtipo_patrimonio, collapse = "' ,'")
+    
+    subtipo_patrimonio <- str_glue("and nombre_subtipo_patrimonio in('{subtipo_patrimonio}') ")
+  }
+  
+  url_tail <- "group by fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio LIMIT 100000000"
+  url_total <- str_c(url_head,
+                     empresa,
+                     patrimonio,
+                     subtipo_patrimonio, 
+                     url_tail) %>% 
+    URLencode()
+  
+  # A data frame
+  fromJSON(url_total) %>% 
+    mutate(across(starts_with("sum_"), as.numeric),
+           fecha_corte = ymd_hms(fecha_corte) %>% 
+             ymd()) %>%  
+    rename_with(~ str_remove(.x, "^sum_")) %>% 
+    arrange(fecha_corte,
+            nombre_entidad,
+            nombre_subtipo_patrimonio,
+            nombre_patrimonio
+    )
+}
+
+test_get_fpvs <- get_fpvs(empresa            = "Alianza Fiduciaria S.A.",
+                          from               = "2022-07-01", 
+                          to                 = "2022-07-31")
 
 
-fpv <- URLencode(str_glue("https://www.datos.gov.co/resource/gpzw-wmxd.json?$query=SELECT fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio, sum(valor_unidad_operaciones), sum(precio_cierre_fondo_dia_t), sum(valor_fondo_cierre_dia_t_2) where fecha_corte between '2022-06-30T00:00:00.000' and '2022-06-30T00:00:00.000' and nombre_patrimonio in('{fpv_names}') group by fecha_corte, nombre_entidad, nombre_patrimonio, nombre_subtipo_patrimonio LIMIT 100000000")) %>%
-  fromJSON() %>% type_convert()
 
 
 
