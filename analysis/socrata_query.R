@@ -121,21 +121,22 @@ get_fpvs <- function(
   
   # Nombres fondos vigentes
   fpv_names <- c(
-    "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN", #
-    "FONDO VOLUNTARIO DE PENSION MULTIOPCION", 
-    "FONDO DE PENSIONES VOLUNTARIAS MULTIACCION", 
-    "FONDO VOLUNTARIO DE PENSIONES GNB", 
-    "F.V.P. DAFUTURO", 
-    "FONDO VOLUNTARIO PENSIONES JUBILACION INVALIDEZ CORREVAL",
-    "FONDO VOLUNTARIO DE PENSIÓN BTG PACTUAL", 
-    "FONDO DE PENSIONES VOLUNTARIAS PLATINO", 
-    "FONDO VOLUNTARIO DE PENSIONES DE JUBILACION E INVALIDEZ RENTA4GLOBAL FIDUCIARIA", 
-    "FDO VOLUNTARIO PENSIONES COLSEGUROS",
-    "FDO.PENS.VOL.CLASS INVERSIONES",
-    "FONDO PENSIONES ESMURFIT VOLUNTA",
-    "FDO,  DE PENSIO. PROTECCI. VOLUNTAR", 
-    "FONDO VOLUNTARIO DE PENSION PORVENIR",
-    "FDO VOLUNT DE PENSIONES MULTIFIND"
+    "F.V.P. DAFUTURO",                                                               
+    "FDO VOLUNT DE PENSIONES MULTIFIND",                                            
+    "FDO VOLUNTARIO PENSIONES COLSEGUROS",          
+    "FDO,  DE PENSIO. PROTECCI. VOLUNTAR",             
+    "FDO.PENS.VOL.CLASS INVERSIONES",                        
+    "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN",           
+    "FONDO DE PENSIONES VOLUNTARIAS MULTIACCION",                               
+    "FONDO DE PENSIONES VOLUNTARIAS PLATINO",                              
+    "FONDO PENSIONES ESMURFIT VOLUNTA",                                     
+    "FONDO VOLUNTARIO DE PENSIÓN BTG PACTUAL",                                 
+    "FONDO VOLUNTARIO DE PENSION MULTIOPCION",                                   
+    "FONDO VOLUNTARIO DE PENSION PORVENIR",                                    
+    "FONDO VOLUNTARIO DE PENSIONES DE JUBILACION E INVALIDEZ RENTA4GLOBAL FIDUCIARIA",
+    "FONDO VOLUNTARIO DE PENSIONES GNB",                                             
+    "FONDO VOLUNTARIO PENSIONES JUBILACION INVALIDEZ CORREVAL",                       
+    "FONDOS DE PENSIONES VOLUNTARIAS"
   ) %>%
     str_c(collapse = "', '")
   
@@ -187,8 +188,4 @@ get_fpvs <- function(
 test_get_fpvs <- get_fpvs(empresa            = "Alianza Fiduciaria S.A.",
                           from               = "2022-07-01", 
                           to                 = "2022-07-31")
-
-
-
-
 
