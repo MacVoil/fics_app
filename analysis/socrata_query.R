@@ -3,6 +3,8 @@ options(scipen = 999)
 library(tidyverse)
 library(lubridate)
 library(jsonlite)
+library(timetk)
+library(quantmod)
 
 # get fics ----
 
@@ -74,7 +76,7 @@ get_fics <- function(
 test_get_fics <- get_fics(empresa            = "Alianza Fiduciaria S.A.", 
                  subtipo_patrimonio = c("FIC DE TIPO GENERAL", 
                                         "FIC INMOBILIARIAS"), 
-                 from               = "2022-07-01", 
+                 from               = "2019-07-01", 
                  to                 = "2022-07-31")
 
 # get fics names ----
@@ -229,7 +231,7 @@ get_fpvs <- function(
 }
 
 test_get_fpvs <- get_fpvs(empresa            = "Alianza Fiduciaria S.A.",
-                          from               = "2022-07-01", 
+                          from               = "2019-07-01", 
                           to                 = "2022-07-31")
 
 # get fpvs names ----
@@ -300,45 +302,46 @@ test_get_fpvs_names <- get_fpvs_names(.nombre_entidad = c("Alianza Fiduciaria S.
   .nombre_patrimonio = c("FDO VOLUNTARIO PENSIONES COLSEGUROS", "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN")
   )
 
+# fund performance ----
 
-# get fics fpv names ----
+fund_performance <- function(
+  data){
+  
+  fund_performance <- data %>% 
+    group_by(nombre_patrimonio) %>% 
+    arrange(nombre_patrimonio, fecha_corte) %>% 
+    filter(precierre_fondo_dia_t != 0) %>% 
+    filter(numero_unidades_fondo_cierre != 0) %>% 
+    filter(n()>30) %>% 
+    slice(-1:-5) %>% 
+    mutate(valor_fondo = precierre_fondo_dia_t/numero_unidades_fondo_cierre)
+  
+  valor_fondo_anomalias <- fund_performance %>% 
+    tk_anomaly_diagnostics(.date_var = fecha_corte, 
+                           .value = valor_fondo, 
+                           .max_anomalies = 0.01, 
+                           .alpha = 0.01, 
+                           .message = FALSE) %>% 
+    select(nombre_patrimonio, fecha_corte, anomaly) %>% 
+    mutate(anomaly = anomaly == "Yes",
+           lag_anomaly = lag(anomaly), 
+           lead_anomaly = lead(anomaly),
+           anomalia = anomaly & !lag_anomaly & !lead_anomaly) %>% 
+    select(nombre_patrimonio, fecha_corte, anomalia)
+  
+  left_join(fund_performance,
+            valor_fondo_anomalias, 
+            by = c("nombre_patrimonio", "fecha_corte")) %>% 
+    mutate(valor_fondo = if_else(anomalia,
+                                 ts_clean_vec(valor_fondo, lambda = "auto"),
+                                 valor_fondo),
+           percent_dif = valor_fondo/lag(valor_fondo)-1) %>% 
+    fill(percent_dif, .direction = "updown") %>% 
+    mutate(vol_anual = slidify_vec(percent_dif, sd, .period = 365, .align = "right", .partial = TRUE)*sqrt(365),
+           rent_mesual = ((valor_fondo/lag(valor_fondo, n = 30))^(365/30))-1,
+           rent_semestral = ((valor_fondo/lag(valor_fondo, n = 182))^(365/182))-1,
+           rent_anual = valor_fondo/lag(valor_fondo, n = 365)-1) %>% 
+    ungroup() %>% 
+    select(-anomalia, -percent_dif)}
 
-get_fics_fpvs_names <- function(
-  .nombre_entidad = NA,
-  .nombre_tipo_entidad = NA,
-  .nombre_subtipo_patrimonio =  NA,
-  .nombre_patrimonio =  NA,
-  .select = c("nombre_entidad", "nombre_tipo_entidad", "nombre_subtipo_patrimonio", "nombre_patrimonio", "max_fecha_corte")) {
-  
-  fics_fpv_names <- get_fics_names() %>% 
-    bind_rows(get_fpvs_names())
-  
-  if(all(!is.na(.nombre_entidad))){
-    fics_fpv_names <- names_tbl %>% 
-      filter(str_to_lower(nombre_entidad) %in% str_to_lower(.nombre_entidad))
-    }
-  
-  if(all(!is.na(.nombre_tipo_entidad))){
-    fics_fpv_names <- names_tbl %>% 
-      filter(str_to_lower(nombre_tipo_entidad) %in% str_to_lower(.nombre_tipo_entidad))
-    }
-  
-  if(all(!is.na(.nombre_subtipo_patrimonio))){
-    fics_fpv_names <- names_tbl %>% 
-      filter(str_to_lower(nombre_subtipo_patrimonio) %in% str_to_lower(.nombre_subtipo_patrimonio))
-    }
-  if(all(!is.na(.nombre_patrimonio))){
-    fics_fpv_names <- names_tbl %>% 
-      filter(str_to_lower(nombre_patrimonio) %in% str_to_lower(.nombre_patrimonio))
-    }
-  
-  fics_fpv_names %>% 
-    select(all_of(.select)) %>% 
-    distinct() %>% 
-    arrange_all()
-  
-  }
-
-tictoc::tic()
-get_fics_fpvs_names() 
-tictoc::toc()
+test_fund_performance <- fund_performance(test_get_fpvs)
