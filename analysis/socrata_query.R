@@ -5,120 +5,7 @@ library(lubridate)
 library(jsonlite)
 library(timetk)
 library(quantmod)
-
-# get fics ----
-
-get_fics <- function(
-    empresa = NULL,
-    patrimonio = NULL,
-    tipo_empresa = NULL,
-    subtipo_patrimonio = NULL,
-    from = today() - years(2),
-    to = today()) {
-      
-      # Transformanos str a date
-      from <- ymd(from)
-      to <- ymd(to)
-      
-      # Estructura url
-      url_head <- str_glue("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT fecha_corte, nombre_entidad, nombre_tipo_entidad,  nombre_patrimonio, nombre_subtipo_patrimonio, sum(numero_unidades_fondo_cierre), sum(precierre_fondo_dia_t), sum(valor_fondo_cierre_dia_t), sum(numero_inversionistas), sum(aportes_recibidos), sum(retiros_redenciones), sum(anulaciones) where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' ")
-      
-      if (!is.null(empresa)) {
-          
-          empresa <- str_c(empresa, collapse = "' ,'")
-          
-          empresa <- str_glue("and nombre_entidad in('{empresa}') ")
-        }
-      
-      if (!is.null(tipo_empresa)) {
-        
-        empresa <- str_c(tipo_empresa, collapse = "' ,'")
-        
-        empresa <- str_glue("and nombre_tipo_entidad in('{tipo_empresa}') ")
-      }
-      
-      if (!is.null(patrimonio)) {
-          
-          patrimonio <- str_c(patrimonio, collapse = "' ,'")
-          
-          patrimonio <- str_glue("and nombre_patrimonio in('{patrimonio}') ")
-        }
-      
-      if (!is.null(subtipo_patrimonio)) {
-          
-          subtipo_patrimonio <- str_c(subtipo_patrimonio, collapse = "' ,'")
-          
-          subtipo_patrimonio <- str_glue("and nombre_subtipo_patrimonio in('{subtipo_patrimonio}') ")
-        }
-      
-      url_tail <- "group by fecha_corte, nombre_entidad, nombre_tipo_entidad, nombre_patrimonio, nombre_subtipo_patrimonio LIMIT 100000000"
-      url_total <- str_c(url_head,
-                         empresa,
-                         patrimonio,
-                         subtipo_patrimonio, 
-                         url_tail) %>% 
-          URLencode()
-      
-      # A data frame
-      fromJSON(url_total) %>% 
-          mutate(across(starts_with("sum_"), as.numeric),
-                 fecha_corte = ymd_hms(fecha_corte) %>% 
-                     ymd()) %>%  
-          rename_with(~ str_remove(.x, "^sum_")) %>% 
-          arrange(fecha_corte,
-                  nombre_entidad,
-                  nombre_subtipo_patrimonio,
-                  nombre_patrimonio
-                  )
-      } 
-
-# Test
-test_get_fics <- get_fics(empresa            = "Alianza Fiduciaria S.A.", 
-                 subtipo_patrimonio = c("FIC DE TIPO GENERAL", 
-                                        "FIC INMOBILIARIAS"), 
-                 from               = "2019-07-01", 
-                 to                 = "2022-07-31")
-
-# get fics names ----
-
-get_fics_names <- function(
-  .nombre_entidad = ".*",
-  .nombre_tipo_entidad =  ".*",
-  .nombre_subtipo_patrimonio =  ".*",
-  .nombre_patrimonio =  ".*",
-  .select = c("nombre_entidad", "nombre_tipo_entidad", "nombre_subtipo_patrimonio", "nombre_patrimonio", "max_fecha_corte")) {
-  
-    # url
-    URLencode("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT nombre_entidad, nombre_tipo_entidad, nombre_subtipo_patrimonio, nombre_patrimonio, max(fecha_corte) group by nombre_entidad, nombre_tipo_entidad, nombre_subtipo_patrimonio, nombre_patrimonio LIMIT 100000000") %>% 
-      fromJSON() %>% 
-      mutate(max_fecha_corte = ymd_hms(max_fecha_corte) %>% 
-               ymd()) %>% 
-      arrange(nombre_entidad, 
-              nombre_tipo_entidad,
-              nombre_subtipo_patrimonio, 
-              nombre_patrimonio) %>% 
-    
-      # Filtro
-      filter(str_detect(str_to_lower(nombre_entidad), str_c(.nombre_entidad, collapse = "|") %>%
-                                                      str_to_lower())) %>% 
-    filter(str_detect(str_to_lower(nombre_tipo_entidad), str_c(.nombre_tipo_entidad, collapse = "|") %>%
-                                                  str_to_lower())) %>% 
-      filter(str_detect(str_to_lower(nombre_subtipo_patrimonio), str_c(.nombre_subtipo_patrimonio, collapse = "|") %>%
-                                                                 str_to_lower())) %>% 
-      filter(str_detect(str_to_lower(nombre_patrimonio), str_c(.nombre_patrimonio, collapse = "|") %>%
-                                                         str_to_lower())) %>% 
-      
-      # seleccionar
-      select(all_of(.select)) %>% 
-      distinct() %>% 
-      arrange_all()
-    }
-
-# Test
-test_get_fics_names <- get_fics_names(.nombre_entidad = c("bancolombia", "alianza"), 
-                                      .nombre_subtipo_patrimonio = "fic", 
-                                      .nombre_patrimonio = "alternativo", 
-                                      .select = c("nombre_entidad", "nombre_tipo_entidad","nombre_patrimonio", "max_fecha_corte"))
+library(plotly)
 
 # get fpvs ----
 
@@ -234,6 +121,8 @@ test_get_fpvs <- get_fpvs(empresa            = "Alianza Fiduciaria S.A.",
                           from               = "2019-07-01", 
                           to                 = "2022-07-31")
 
+
+
 # get fpvs names ----
 
 get_fpvs_names <- function(
@@ -286,10 +175,10 @@ get_fpvs_names <- function(
   if(all(!is.na(.nombre_subtipo_patrimonio))){
     names_tbl <- names_tbl %>% 
       filter(str_to_lower(nombre_subtipo_patrimonio) %in% str_to_lower(.nombre_subtipo_patrimonio))
-    }
+  }
   
   
-    # seleccionar
+  # seleccionar
   names_tbl %>% 
     select(all_of(.select)) %>% 
     distinct() %>% 
@@ -298,50 +187,362 @@ get_fpvs_names <- function(
 }
 
 test_get_fpvs_names <- get_fpvs_names(.nombre_entidad = c("Alianza Fiduciaria S.A.", "Allianz Seguros De Vida S.A."),
-  .nombre_subtipo_patrimonio = c("FDOS DE PENSIONES(JUBIL-INVAL)","VOLUNTARIOS"),
-  .nombre_patrimonio = c("FDO VOLUNTARIO PENSIONES COLSEGUROS", "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN")
-  )
+                                      .nombre_subtipo_patrimonio = c("FDOS DE PENSIONES(JUBIL-INVAL)","VOLUNTARIOS"),
+                                      .nombre_patrimonio = c("FDO VOLUNTARIO PENSIONES COLSEGUROS", "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN")
+)
+
+# get fpvs price ----
+
+get_fpvs_price <- function(
+  
+  from = today() - years(2),
+  to = today()) {
+  
+  # Transformanos str a date
+  from <- ymd(from)
+  to <- ymd(to)
+  
+  # Nombres fondos vigentes
+  fpv_names <- c(
+    "F.V.P. DAFUTURO",                                                               
+    "FDO VOLUNT DE PENSIONES MULTIFIND",                                            
+    "FDO VOLUNTARIO PENSIONES COLSEGUROS",          
+    "FDO,  DE PENSIO. PROTECCI. VOLUNTAR",             
+    "FDO.PENS.VOL.CLASS INVERSIONES",                        
+    "FONDO DE PENSIONES DE JUBILACION E INVALIDEZ VISIÓN",           
+    "FONDO DE PENSIONES VOLUNTARIAS MULTIACCION",                               
+    "FONDO DE PENSIONES VOLUNTARIAS PLATINO",                              
+    "FONDO PENSIONES ESMURFIT VOLUNTA",                                     
+    "FONDO VOLUNTARIO DE PENSIÓN BTG PACTUAL",                                 
+    "FONDO VOLUNTARIO DE PENSION MULTIOPCION",                                   
+    "FONDO VOLUNTARIO DE PENSION PORVENIR",                                    
+    "FONDO VOLUNTARIO DE PENSIONES DE JUBILACION E INVALIDEZ RENTA4GLOBAL FIDUCIARIA",
+    "FONDO VOLUNTARIO DE PENSIONES GNB",                                             
+    "FONDO VOLUNTARIO PENSIONES JUBILACION INVALIDEZ CORREVAL",                       
+    "FONDOS DE PENSIONES VOLUNTARIAS"
+  ) %>%
+    str_c(collapse = "', '")
+  
+  # Estructura url
+  url_head <- str_glue("https://www.datos.gov.co/resource/gpzw-wmxd.json?$query=SELECT fecha_corte, nombre_entidad, nombre_tipo_entidad,  nombre_patrimonio, nombre_subtipo_patrimonio, valor_unidad_operaciones where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' and nombre_patrimonio not in('{fpv_names}') LIMIT 100000000") %>% 
+    URLencode() %>% 
+    fromJSON() %>% 
+    mutate(valor_unidad_operaciones = as.numeric(valor_unidad_operaciones),
+           fecha_corte = ymd_hms(fecha_corte) %>% 
+             ymd())
+}
+
+tictoc::tic()
+test_get_fpvs_price <- get_fpvs_price()
+tictoc::toc()
+
+
+
+# get fics ----
+
+get_fics <- function(
+    empresa = NULL,
+    patrimonio = NULL,
+    tipo_empresa = NULL,
+    subtipo_patrimonio = NULL,
+    from = today() - years(2),
+    to = today()) {
+      
+      # Transformanos str a date
+      from <- ymd(from)
+      to <- ymd(to)
+      
+      # Estructura url
+      url_head <- str_glue("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT fecha_corte, nombre_entidad, nombre_tipo_entidad,  nombre_patrimonio, nombre_subtipo_patrimonio, sum(numero_unidades_fondo_cierre), sum(precierre_fondo_dia_t), sum(valor_fondo_cierre_dia_t), sum(numero_inversionistas), sum(aportes_recibidos), sum(retiros_redenciones), sum(anulaciones) where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' ")
+      
+      if (!is.null(empresa)) {
+          
+          empresa <- str_c(empresa, collapse = "' ,'")
+          
+          empresa <- str_glue("and nombre_entidad in('{empresa}') ")
+        }
+      
+      if (!is.null(tipo_empresa)) {
+        
+        empresa <- str_c(tipo_empresa, collapse = "' ,'")
+        
+        empresa <- str_glue("and nombre_tipo_entidad in('{tipo_empresa}') ")
+      }
+      
+      if (!is.null(patrimonio)) {
+          
+          patrimonio <- str_c(patrimonio, collapse = "' ,'")
+          
+          patrimonio <- str_glue("and nombre_patrimonio in('{patrimonio}') ")
+        }
+      
+      if (!is.null(subtipo_patrimonio)) {
+          
+          subtipo_patrimonio <- str_c(subtipo_patrimonio, collapse = "' ,'")
+          
+          subtipo_patrimonio <- str_glue("and nombre_subtipo_patrimonio in('{subtipo_patrimonio}') ")
+        }
+      
+      url_tail <- "group by fecha_corte, nombre_entidad, nombre_tipo_entidad, nombre_patrimonio, nombre_subtipo_patrimonio LIMIT 100000000"
+      url_total <- str_c(url_head,
+                         empresa,
+                         patrimonio,
+                         subtipo_patrimonio, 
+                         url_tail) %>% 
+          URLencode()
+      
+      # A data frame
+      fromJSON(url_total) %>% 
+          mutate(across(starts_with("sum_"), as.numeric),
+                 fecha_corte = ymd_hms(fecha_corte) %>% 
+                     ymd()) %>%  
+          rename_with(~ str_remove(.x, "^sum_")) %>% 
+          arrange(fecha_corte,
+                  nombre_entidad,
+                  nombre_subtipo_patrimonio,
+                  nombre_patrimonio
+                  )
+      } 
+
+# Test
+test_get_fics <- get_fics(empresa            = "Alianza Fiduciaria S.A.", 
+                 subtipo_patrimonio = c("FIC DE TIPO GENERAL", 
+                                        "FIC INMOBILIARIAS"), 
+                 from               = "2019-07-01", 
+                 to                 = "2022-07-31")
+
+# get fics names ----
+
+get_fics_names <- function(
+  .nombre_entidad = ".*",
+  .nombre_tipo_entidad =  ".*",
+  .nombre_subtipo_patrimonio =  ".*",
+  .nombre_patrimonio =  ".*",
+  .select = c("nombre_entidad", "nombre_tipo_entidad", "nombre_subtipo_patrimonio", "nombre_patrimonio", "max_fecha_corte")) {
+  
+    # url
+    URLencode("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT nombre_entidad, nombre_tipo_entidad, nombre_subtipo_patrimonio, nombre_patrimonio, max(fecha_corte) group by nombre_entidad, nombre_tipo_entidad, nombre_subtipo_patrimonio, nombre_patrimonio LIMIT 100000000") %>% 
+      fromJSON() %>% 
+      mutate(max_fecha_corte = ymd_hms(max_fecha_corte) %>% 
+               ymd()) %>% 
+      arrange(nombre_entidad, 
+              nombre_tipo_entidad,
+              nombre_subtipo_patrimonio, 
+              nombre_patrimonio) %>% 
+    
+      # Filtro
+      filter(str_detect(str_to_lower(nombre_entidad), str_c(.nombre_entidad, collapse = "|") %>%
+                                                      str_to_lower())) %>% 
+      filter(str_detect(str_to_lower(nombre_tipo_entidad), str_c(.nombre_tipo_entidad, collapse = "|") %>%
+                                                  str_to_lower())) %>% 
+      filter(str_detect(str_to_lower(nombre_subtipo_patrimonio), str_c(.nombre_subtipo_patrimonio, collapse = "|") %>%
+                                                                 str_to_lower())) %>% 
+      filter(str_detect(str_to_lower(nombre_patrimonio), str_c(.nombre_patrimonio, collapse = "|") %>%
+                                                         str_to_lower())) %>% 
+      
+      # seleccionar
+      select(all_of(.select)) %>% 
+      distinct() %>% 
+      arrange_all()
+    }
+
+# Test
+test_get_fics_names <- get_fics_names(.nombre_entidad = c("bancolombia", "alianza"), 
+                                      .nombre_subtipo_patrimonio = "fic", 
+                                      .nombre_patrimonio = "alternativo", 
+                                      .select = c("nombre_entidad", "nombre_tipo_entidad","nombre_patrimonio", "max_fecha_corte"))
+
+
+# get fics price----
+
+get_fics_price <- function(
+  from = today() - years(2),
+  to = today(),
+  empresa = NULL,
+  patrimonio = NULL,
+  tipo_empresa = NULL,
+  subtipo_patrimonio = NULL,
+  id_participacion = NULL) {
+  
+  # Transformanos str a date
+  from <- ymd(from)
+  to <- ymd(to)
+  
+  # Estructura url
+  url_head <- str_glue("https://www.datos.gov.co/resource/qhpu-8ixx.json?$query=SELECT fecha_corte, nombre_entidad, nombre_tipo_entidad,  nombre_patrimonio, nombre_subtipo_patrimonio, tipo_participacion,valor_unidad_operaciones, numero_inversionistas where fecha_corte between '{from}T00:00:00.000' and '{to}T00:00:00.000' ") 
+  
+  if (!is.null(empresa)) {
+    
+    empresa <- str_c(empresa, collapse = "' ,'")
+    
+    empresa <- str_glue("and nombre_entidad in('{empresa}') ")
+  }
+  
+  if (!is.null(tipo_empresa)) {
+    
+    empresa <- str_c(tipo_empresa, collapse = "' ,'")
+    
+    empresa <- str_glue("and nombre_tipo_entidad in('{tipo_empresa}') ")
+  }
+  
+  if (!is.null(patrimonio)) {
+    
+    patrimonio <- str_c(patrimonio, collapse = "' ,'")
+    
+    patrimonio <- str_glue("and nombre_patrimonio in('{patrimonio}') ")
+  }
+  
+  if (!is.null(subtipo_patrimonio)) {
+    
+    subtipo_patrimonio <- str_c(subtipo_patrimonio, collapse = "' ,'")
+    
+    subtipo_patrimonio <- str_glue("and nombre_subtipo_patrimonio in('{subtipo_patrimonio}') ")
+  }
+  
+  if (!is.null(id_participacion)) {
+    
+    id_participacion <- str_c(subtipo_patrimonio, collapse = "' ,'")
+    
+    id_participacion <- str_glue("and nombre_subtipo_patrimonio in('{id_participacion}') ")
+  }
+  
+  url_tail <- "LIMIT 100000000"
+  url_total <- str_c(url_head,
+                     empresa,
+                     patrimonio,
+                     subtipo_patrimonio, 
+                     url_tail)
+  
+  url_total %>% 
+    URLencode() %>% 
+    fromJSON() %>% 
+    mutate(across((valor_unidad_operaciones:numero_inversionistas), as.numeric),
+           fecha_corte = ymd_hms(fecha_corte) %>% 
+             ymd()) 
+} 
+
+# Test
+tictoc::tic()
+test_get_fics_price <- get_fics_price()
+tictoc::toc()
+
+# Test solo fics
+tictoc::tic()
+test_get_fics_price_2 <- get_fics_price(subtipo_patrimonio = c("FIC DE TIPO GENERAL", "FIC INMOBILIARIAS", "FIC DE MERCADO MONETARIO", "FIC BURSATILES"))
+tictoc::toc()
+
+# Test solo fics + solo fiduciarias
+tictoc::tic()
+test_get_fics_price_3 <- get_fics_price(subtipo_patrimonio = c("FIC DE TIPO GENERAL", "FIC INMOBILIARIAS", "FIC DE MERCADO MONETARIO", "FIC BURSATILES"),
+                                        tipo_empresa = "SF-SOCIEDAD FIDUCIARIA")
+tictoc::toc()
+
+# Test solo fics + solo fiduciarias + alianza
+tictoc::tic()
+test_get_fics_price_4 <- get_fics_price(subtipo_patrimonio = c("FIC DE TIPO GENERAL", "FIC INMOBILIARIAS", "FIC DE MERCADO MONETARIO", "FIC BURSATILES"),
+                                        tipo_empresa = "SF-SOCIEDAD FIDUCIARIA",
+                                        empresa = "Alianza Fiduciaria S.A.")
+tictoc::toc()
+
+# Test solo fics + solo fiduciarias + alianza + sentencias I
+tictoc::tic()
+test_get_fics_price_5 <- get_fics_price(subtipo_patrimonio = c("FIC DE TIPO GENERAL", "FIC INMOBILIARIAS", "FIC DE MERCADO MONETARIO", "FIC BURSATILES"),
+                                        tipo_empresa = "SF-SOCIEDAD FIDUCIARIA",
+                                        empresa = "Alianza Fiduciaria S.A.",
+                                        patrimonio = "FONDO DE INVERSIÓN COLECTIVA CERRADO SENTENCIAS NACIÓN ALIANZA")
+tictoc::toc()
+
+# Test fondo descontinuadoI
+tictoc::tic()
+test_get_fics_price_6 <- get_fics_price(patrimonio = "FIC SURA ACCIONES COLOMBIA")
+tictoc::toc()
+
+
+
 
 # fund performance ----
 
-fund_performance <- function(
+fics_performance <- function(
   data){
   
-  fund_performance <- data %>% 
-    group_by(nombre_patrimonio) %>% 
+  data %>% 
+    group_by(nombre_patrimonio, tipo_participacion) %>% 
     arrange(nombre_patrimonio, fecha_corte) %>% 
-    filter(precierre_fondo_dia_t != 0) %>% 
-    filter(numero_unidades_fondo_cierre != 0) %>% 
-    filter(n()>30) %>% 
-    slice(-1:-5) %>% 
-    mutate(valor_fondo = precierre_fondo_dia_t/numero_unidades_fondo_cierre)
-  
-  valor_fondo_anomalias <- fund_performance %>% 
-    tk_anomaly_diagnostics(.date_var = fecha_corte, 
-                           .value = valor_fondo, 
-                           .max_anomalies = 0.01, 
-                           .alpha = 0.01, 
-                           .message = FALSE) %>% 
-    select(nombre_patrimonio, fecha_corte, anomaly) %>% 
-    mutate(anomaly = anomaly == "Yes",
-           lag_anomaly = lag(anomaly), 
-           lead_anomaly = lead(anomaly),
-           anomalia = anomaly & !lag_anomaly & !lead_anomaly) %>% 
-    select(nombre_patrimonio, fecha_corte, anomalia)
-  
-  left_join(fund_performance,
-            valor_fondo_anomalias, 
-            by = c("nombre_patrimonio", "fecha_corte")) %>% 
-    mutate(valor_fondo = if_else(anomalia,
-                                 ts_clean_vec(valor_fondo, lambda = "auto"),
-                                 valor_fondo),
-           percent_dif = valor_fondo/lag(valor_fondo)-1) %>% 
-    fill(percent_dif, .direction = "updown") %>% 
-    mutate(vol_anual = slidify_vec(percent_dif, sd, .period = 365, .align = "right", .partial = TRUE)*sqrt(365),
-           rent_mesual = ((valor_fondo/lag(valor_fondo, n = 30))^(365/30))-1,
-           rent_semestral = ((valor_fondo/lag(valor_fondo, n = 182))^(365/182))-1,
-           rent_anual = valor_fondo/lag(valor_fondo, n = 365)-1) %>% 
-    ungroup() %>% 
-    select(-anomalia, -percent_dif)}
+    mutate(percent_dif = valor_unidad_operaciones/lag(valor_unidad_operaciones)-1) %>% 
+    mutate(vol_mensual = slidify_vec(percent_dif, sd, .period = 30, .align = "right", .partial = TRUE)*sqrt(365),
+           vol_semestral = slidify_vec(percent_dif, sd, .period = 180, .align = "right", .partial = TRUE)*sqrt(365),
+           vol_anual = slidify_vec(percent_dif, sd, .period = 365, .align = "right", .partial = TRUE)*sqrt(365),
+           rent_mesual = ((valor_unidad_operaciones/lag(valor_unidad_operaciones, n = 30))^(365/30))-1,
+           rent_semestral = ((valor_unidad_operaciones/lag(valor_unidad_operaciones, n = 182))^(365/182))-1,
+           rent_anual = valor_unidad_operaciones/lag(valor_unidad_operaciones, n = 365)-1) %>% 
+    ungroup() 
+  }
 
-test_fund_performance <- fund_performance(test_get_fpvs)
+test_fics_performance <- fics_performance(test_get_fics_price_5)
+
+# fics vigentes ----
+
+fics_vigentes <- function(data){
+  data %>%
+    mutate(max_last_month = (today() %m-% months(1)) %>% 
+             floor_date("month")) %>% 
+    group_by(nombre_patrimonio, tipo_participacion) %>% 
+    summarise(max_last_month = max(max_last_month),
+              max_fecha_corte = max(fecha_corte)) %>% 
+    ungroup() %>% 
+    filter(max_fecha_corte >= max_last_month) %>% 
+    select(nombre_patrimonio, tipo_participacion) %>% 
+    inner_join(data, by = c("nombre_patrimonio", "tipo_participacion"))
+}
+
+test_fics_vigentes <- fics_vigentes(test_fics_performance)
+
+# median_fics ----
+
+median_fics <- function(data){
+  data %>% 
+    group_by(nombre_patrimonio, nombre_entidad, nombre_subtipo_patrimonio, nombre_tipo_entidad) %>% 
+    filter(fecha_corte == max(fecha_corte)) %>% 
+    filter(numero_inversionistas == max(numero_inversionistas)) %>% 
+    distinct(numero_inversionistas, .keep_all = TRUE) %>% 
+    ungroup() %>%  
+    select(nombre_patrimonio, nombre_entidad, nombre_subtipo_patrimonio, nombre_tipo_entidad, tipo_participacion)
+}
+
+test_median_fics <- median_fics(test_fics_vigentes)
+
+# price plot ----
+
+(test_fics_vigentes %>% 
+   filter(tipo_participacion == "501") %>% 
+   ggplot(aes(fecha_corte, valor_unidad_operaciones)) +
+   geom_line()) %>%
+  ggplotly()
+
+(test_fics_vigentes %>% 
+    filter(tipo_participacion == "501") %>% 
+    ggplot(aes(fecha_corte, percent_dif)) +
+    geom_line()) %>% 
+  ggplotly()
+
+g <- test_fics_performance %>% 
+  filter(nombre_subtipo_patrimonio != "FONDOS DE CAPITAL PRIVADO") %>% 
+  group_by(fecha_corte, nombre_entidad, nombre_tipo_entidad, nombre_patrimonio, nombre_subtipo_patrimonio) %>% 
+  filter(numero_inversionistas == max(numero_inversionistas)) %>% 
+  distinct(numero_inversionistas, .keep_all = TRUE) %>% 
+  ungroup() %>% 
+  filter(!is.na(rent_mesual)) %>% 
+  group_by(nombre_patrimonio, tipo_participacion) %>% 
+  filter(floor_date(max(test_fics_performance$fecha_corte), unit = "month") == floor_date(max(fecha_corte), unit = "month")) %>% 
+  ungroup() %>% 
+  filter(fecha_corte == max(fecha_corte)) %>% 
+  filter(rent_anual > 0) %>% 
+  filter((rent_anual-vol_anual) > 0.1043) %>% 
+  filter(rent_anual > vol_anual) %>% 
+  ggplot(aes(vol_anual, rent_anual, col = nombre_entidad, size = rent_anual-vol_anual, group = nombre_patrimonio)) +
+  geom_point()
+
+plotly::ggplotly(g, dynamicTicks = TRUE)  
+
+
+
